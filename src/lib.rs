@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, error::Error};
 
-use bevy_app::{NonSendMarker, Plugin};
+use bevy_app::{App, AppExit, NonSendMarker, Plugin, PluginsState};
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::{
     entity::{Entity, EntityHashMap},
@@ -8,6 +8,9 @@ use bevy_ecs::{
     system::{Commands, Query},
 };
 use bevy_window::{RawHandleWrapper, RawHandleWrapperHolder, Window, WindowWrapper};
+use raw_window_handle::{
+    DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, WindowHandle,
+};
 use sdl3::{Sdl, video::Window as Sdl3Window};
 use tracing::info;
 
@@ -15,7 +18,17 @@ pub struct Sdl3Plugin;
 impl Plugin for Sdl3Plugin {
     fn build(&self, app: &mut bevy_app::App) {
         SdlContext::init();
+        app.set_runner(sdl3_runner);
     }
+}
+
+fn sdl3_runner(mut app: App) -> AppExit {
+    if app.plugins_state() == PluginsState::Ready {
+        app.finish();
+        app.cleanup();
+    }
+
+    AppExit::Success
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
@@ -29,13 +42,13 @@ unsafe impl<'a> Send for SyncWindow {}
 unsafe impl<'a> Sync for SyncWindow {}
 
 impl HasWindowHandle for SyncWindow {
-    fn window_handle(&self) -> Result<wgpu::rwh::WindowHandle<'_>, wgpu::rwh::HandleError> {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
         self.0.window_handle()
     }
 }
 
 impl HasDisplayHandle for SyncWindow {
-    fn display_handle(&self) -> Result<wgpu::rwh::DisplayHandle<'_>, wgpu::rwh::HandleError> {
+    fn display_handle(&self) -> Result<DisplayHandle<'_>, HandleError> {
         self.0.display_handle()
     }
 }
