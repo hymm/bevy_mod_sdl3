@@ -1,6 +1,8 @@
+mod non_send_marker;
+
 use std::{cell::RefCell, collections::HashMap, error::Error};
 
-use bevy_app::{App, AppExit, NonSendMarker, Plugin, PluginsState};
+use bevy_app::{App, AppExit, Last, Plugin, PluginsState};
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::{
     entity::{Entity, EntityHashMap},
@@ -11,14 +13,22 @@ use bevy_window::{RawHandleWrapper, RawHandleWrapperHolder, Window, WindowWrappe
 use raw_window_handle::{
     DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, WindowHandle,
 };
-use sdl3::{Sdl, video::Window as Sdl3Window};
+use sdl3::{
+    Sdl,
+    event::{Event as SdlEvent, WindowEvent as SdlWindowEvent},
+    keyboard::Keycode,
+    video::Window as Sdl3Window,
+};
 use tracing::info;
+
+use crate::non_send_marker::NonSendMarker;
 
 pub struct Sdl3Plugin;
 impl Plugin for Sdl3Plugin {
     fn build(&self, app: &mut bevy_app::App) {
         SdlContext::init();
         app.set_runner(sdl3_runner);
+        app.add_systems(Last, create_windows);
     }
 }
 
@@ -28,6 +38,49 @@ fn sdl3_runner(mut app: App) -> AppExit {
         app.cleanup();
     }
 
+    let mut event_pump = SDL_CONTEXT
+        .with_borrow_mut(|sdl_context| sdl_context.as_mut().unwrap().sdl.event_pump())
+        .unwrap();
+
+    'running: loop {
+        if app.plugins_state() != PluginsState::Cleaned {
+            app.finish();
+            app.cleanup();
+        }
+
+        for event in event_pump.poll_iter() {
+            match event {
+                // TODO: add window configuration
+                // SdlEvent::Window {
+                //     window_id,
+                //     win_event:
+                //         SdlWindowEvent::PixelSizeChanged(width, height)
+                //         | SdlWindowEvent::Resized(width, height),
+                //     ..
+                // } if window_id == window.id() => {
+                //     config.width = width as u32;
+                //     config.height = height as u32;
+
+                //     surface.configure(&device, &config);
+                // }
+                SdlEvent::Quit { .. }
+                | SdlEvent::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => {
+                    break 'running;
+                }
+                e => {
+                    dbg!(e);
+                }
+            }
+        }
+
+        if app.plugins_state() == PluginsState::Cleaned {
+            app.update();
+        }
+    }
+
     AppExit::Success
 }
 
@@ -35,7 +88,7 @@ fn sdl3_runner(mut app: App) -> AppExit {
 pub struct WindowId(pub u32);
 
 #[derive(Deref, DerefMut)]
-struct SyncWindow(Sdl3Window);
+pub struct SyncWindow(Sdl3Window);
 
 // TODO: not sure if this is safe. example only does this for &Sdl3Window. It might be that that is a hack for wgpu.
 unsafe impl<'a> Send for SyncWindow {}
