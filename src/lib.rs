@@ -1,3 +1,4 @@
+mod keyboard;
 mod non_send_marker;
 
 use std::{cell::RefCell, collections::HashMap, error::Error};
@@ -9,6 +10,7 @@ use bevy_ecs::{
     error::BevyError,
     system::{Commands, Query},
 };
+use bevy_input::ButtonState;
 use bevy_window::{RawHandleWrapper, RawHandleWrapperHolder, Window, WindowWrapper};
 use raw_window_handle::{
     DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, WindowHandle,
@@ -16,12 +18,11 @@ use raw_window_handle::{
 use sdl3::{
     Sdl,
     event::{Event as SdlEvent, WindowEvent as SdlWindowEvent},
-    keyboard::Keycode,
     video::Window as Sdl3Window,
 };
 use tracing::info;
 
-use crate::non_send_marker::NonSendMarker;
+use crate::{keyboard::handle_keyboard_events, non_send_marker::NonSendMarker};
 
 pub struct Sdl3Plugin;
 impl Plugin for Sdl3Plugin {
@@ -63,15 +64,53 @@ fn sdl3_runner(mut app: App) -> AppExit {
 
                 //     surface.configure(&device, &config);
                 // }
-                SdlEvent::Quit { .. }
-                | SdlEvent::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => {
+                SdlEvent::KeyDown {
+                    timestamp,
+                    window_id,
+                    keycode,
+                    scancode,
+                    keymod,
+                    repeat,
+                    which,
+                    raw,
+                } => handle_keyboard_events(
+                    app.world_mut(),
+                    ButtonState::Pressed,
+                    timestamp,
+                    window_id,
+                    keycode,
+                    scancode,
+                    keymod,
+                    repeat,
+                    which,
+                    raw,
+                ),
+                SdlEvent::KeyUp {
+                    timestamp,
+                    window_id,
+                    keycode,
+                    scancode,
+                    keymod,
+                    repeat,
+                    which,
+                    raw,
+                } => handle_keyboard_events(
+                    app.world_mut(),
+                    ButtonState::Released,
+                    timestamp,
+                    window_id,
+                    keycode,
+                    scancode,
+                    keymod,
+                    repeat,
+                    which,
+                    raw,
+                ),
+                SdlEvent::Quit { .. } => {
                     break 'running;
                 }
-                e => {
-                    dbg!(e);
+                _e => {
+                    // dbg!(_e);
                 }
             }
         }
@@ -86,6 +125,12 @@ fn sdl3_runner(mut app: App) -> AppExit {
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct WindowId(pub u32);
+
+impl From<u32> for WindowId {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Deref, DerefMut)]
 pub struct SyncWindow(Sdl3Window);
@@ -157,7 +202,7 @@ impl Sdl3Windows {
         &mut self,
         sdl: &Sdl,
         entity: Entity,
-        window: &Window,
+        _window: &Window,
     ) -> Result<&WindowWrapper<SyncWindow>, Box<dyn Error + Send + Sync>> {
         let video = sdl.video()?;
         let window = video
@@ -186,6 +231,7 @@ impl Sdl3Windows {
 fn create_windows(
     mut commands: Commands,
     mut created_windows: Query<(Entity, &mut Window, Option<&RawHandleWrapperHolder>)>,
+    // sdl windows need to be created on the main thread
     _non_send: NonSendMarker,
 ) -> Result<(), BevyError> {
     SDL_CONTEXT.with_borrow_mut(|context| {
