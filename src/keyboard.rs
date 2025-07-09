@@ -29,9 +29,7 @@ pub fn handle_keyboard_events(
             .copied()
     });
     world.send_event(KeyboardInput {
-        key_code: dbg!(convert_sdl_scancode_to_physical_key(
-            scancode.unwrap_or(SdlScancode::Unknown)
-        )),
+        key_code: convert_sdl_scancode_to_physical_key(scancode.unwrap_or(SdlScancode::Unknown)),
         logical_key: convert_sdl_keycode_to_key(keycode.unwrap_or(SdlKeycode::Unknown), keymod),
         state: button_state,
         text: None,
