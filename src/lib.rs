@@ -2,30 +2,15 @@ mod keyboard;
 mod non_send_marker;
 mod window;
 
-use std::{cell::RefCell, collections::HashMap, error::Error};
+use std::cell::RefCell;
 
 use bevy_app::{App, AppExit, Last, Plugin, PluginsState};
-use bevy_derive::{Deref, DerefMut};
-use bevy_ecs::{
-    entity::{Entity, EntityHashMap},
-    error::BevyError,
-    system::{Commands, Query},
-};
 use bevy_input::ButtonState;
-use bevy_window::{RawHandleWrapper, RawHandleWrapperHolder, Window, WindowWrapper};
-use raw_window_handle::{
-    DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, WindowHandle,
-};
-use sdl3::{
-    Sdl,
-    event::{Event as SdlEvent, WindowEvent as SdlWindowEvent},
-    video::Window as Sdl3Window,
-};
-use tracing::info;
+use bevy_window::WindowEvent;
+use sdl3::{Sdl, event::Event as SdlEvent};
 
 use crate::{
     keyboard::handle_keyboard_events,
-    non_send_marker::NonSendMarker,
     window::{Sdl3Windows, create_windows, handle_window_events},
 };
 
@@ -61,7 +46,7 @@ fn sdl3_runner(mut app: App) -> AppExit {
                     window_id,
                     win_event,
                 } => {
-                    handle_window_events(timestamp, window_id, win_event);
+                    handle_window_events(app.world_mut(), timestamp, window_id, win_event);
                 }
                 SdlEvent::KeyDown {
                     timestamp,
@@ -108,8 +93,244 @@ fn sdl3_runner(mut app: App) -> AppExit {
                 SdlEvent::Quit { .. } => {
                     break 'running;
                 }
-                _e => {
-                    // dbg!(_e);
+                // TODO: we may need to do more with AppLifecyle to match the winit behavior
+                SdlEvent::AppWillEnterBackground { timestamp: _ } => {
+                    app.world_mut().send_event(WindowEvent::AppLifecycle(
+                        bevy_window::AppLifecycle::WillSuspend,
+                    ));
+                }
+                SdlEvent::AppDidEnterBackground { timestamp: _ } => {
+                    app.world_mut().send_event(WindowEvent::AppLifecycle(
+                        bevy_window::AppLifecycle::Suspended,
+                    ));
+                }
+                SdlEvent::AppWillEnterForeground { timestamp: _ } => {
+                    app.world_mut().send_event(WindowEvent::AppLifecycle(
+                        bevy_window::AppLifecycle::WillResume,
+                    ));
+                }
+                SdlEvent::AppDidEnterForeground { timestamp: _ } => {
+                    app.world_mut().send_event(WindowEvent::AppLifecycle(
+                        bevy_window::AppLifecycle::Running,
+                    ));
+                }
+                // SdlEvent::AppTerminating { timestamp } => todo!(),
+                // SdlEvent::AppLowMemory { timestamp } => todo!(),
+                // SdlEvent::TextEditing {
+                //     timestamp,
+                //     window_id,
+                //     text,
+                //     start,
+                //     length,
+                // } => todo!(),
+                // SdlEvent::TextInput {
+                //     timestamp,
+                //     window_id,
+                //     text,
+                // } => todo!(),
+                // SdlEvent::MouseMotion {
+                //     timestamp,
+                //     window_id,
+                //     which,
+                //     mousestate,
+                //     x,
+                //     y,
+                //     xrel,
+                //     yrel,
+                // } => todo!(),
+                // SdlEvent::MouseButtonDown {
+                //     timestamp,
+                //     window_id,
+                //     which,
+                //     mouse_btn,
+                //     clicks,
+                //     x,
+                //     y,
+                // } => todo!(),
+                // SdlEvent::MouseButtonUp {
+                //     timestamp,
+                //     window_id,
+                //     which,
+                //     mouse_btn,
+                //     clicks,
+                //     x,
+                //     y,
+                // } => todo!(),
+                // SdlEvent::MouseWheel {
+                //     timestamp,
+                //     window_id,
+                //     which,
+                //     x,
+                //     y,
+                //     direction,
+                //     mouse_x,
+                //     mouse_y,
+                // } => todo!(),
+                // SdlEvent::JoyAxisMotion {
+                //     timestamp,
+                //     which,
+                //     axis_idx,
+                //     value,
+                // } => todo!(),
+                // SdlEvent::JoyHatMotion {
+                //     timestamp,
+                //     which,
+                //     hat_idx,
+                //     state,
+                // } => todo!(),
+                // SdlEvent::JoyButtonDown {
+                //     timestamp,
+                //     which,
+                //     button_idx,
+                // } => todo!(),
+                // SdlEvent::JoyButtonUp {
+                //     timestamp,
+                //     which,
+                //     button_idx,
+                // } => todo!(),
+                // SdlEvent::JoyDeviceAdded { timestamp, which } => todo!(),
+                // SdlEvent::JoyDeviceRemoved { timestamp, which } => todo!(),
+                // SdlEvent::ControllerAxisMotion {
+                //     timestamp,
+                //     which,
+                //     axis,
+                //     value,
+                // } => todo!(),
+                // SdlEvent::ControllerButtonDown {
+                //     timestamp,
+                //     which,
+                //     button,
+                // } => todo!(),
+                // SdlEvent::ControllerButtonUp {
+                //     timestamp,
+                //     which,
+                //     button,
+                // } => todo!(),
+                // SdlEvent::ControllerDeviceAdded { timestamp, which } => todo!(),
+                // SdlEvent::ControllerDeviceRemoved { timestamp, which } => todo!(),
+                // SdlEvent::ControllerDeviceRemapped { timestamp, which } => todo!(),
+                // SdlEvent::ControllerTouchpadDown {
+                //     timestamp,
+                //     which,
+                //     touchpad,
+                //     finger,
+                //     x,
+                //     y,
+                //     pressure,
+                // } => todo!(),
+                // SdlEvent::ControllerTouchpadMotion {
+                //     timestamp,
+                //     which,
+                //     touchpad,
+                //     finger,
+                //     x,
+                //     y,
+                //     pressure,
+                // } => todo!(),
+                // SdlEvent::ControllerTouchpadUp {
+                //     timestamp,
+                //     which,
+                //     touchpad,
+                //     finger,
+                //     x,
+                //     y,
+                //     pressure,
+                // } => todo!(),
+                // SdlEvent::FingerDown {
+                //     timestamp,
+                //     touch_id,
+                //     finger_id,
+                //     x,
+                //     y,
+                //     dx,
+                //     dy,
+                //     pressure,
+                // } => todo!(),
+                // SdlEvent::FingerUp {
+                //     timestamp,
+                //     touch_id,
+                //     finger_id,
+                //     x,
+                //     y,
+                //     dx,
+                //     dy,
+                //     pressure,
+                // } => todo!(),
+                // SdlEvent::FingerMotion {
+                //     timestamp,
+                //     touch_id,
+                //     finger_id,
+                //     x,
+                //     y,
+                //     dx,
+                //     dy,
+                //     pressure,
+                // } => todo!(),
+                // SdlEvent::DollarRecord {
+                //     timestamp,
+                //     touch_id,
+                //     gesture_id,
+                //     num_fingers,
+                //     error,
+                //     x,
+                //     y,
+                // } => todo!(),
+                // SdlEvent::MultiGesture {
+                //     timestamp,
+                //     touch_id,
+                //     d_theta,
+                //     d_dist,
+                //     x,
+                //     y,
+                //     num_fingers,
+                // } => todo!(),
+                // SdlEvent::ClipboardUpdate { timestamp } => todo!(),
+                // SdlEvent::DropFile {
+                //     timestamp,
+                //     window_id,
+                //     filename,
+                // } => todo!(),
+                // SdlEvent::DropText {
+                //     timestamp,
+                //     window_id,
+                //     filename,
+                // } => todo!(),
+                // SdlEvent::DropBegin {
+                //     timestamp,
+                //     window_id,
+                // } => todo!(),
+                // SdlEvent::DropComplete {
+                //     timestamp,
+                //     window_id,
+                // } => todo!(),
+                // SdlEvent::AudioDeviceAdded {
+                //     timestamp,
+                //     which,
+                //     iscapture,
+                // } => todo!(),
+                // SdlEvent::AudioDeviceRemoved {
+                //     timestamp,
+                //     which,
+                //     iscapture,
+                // } => todo!(),
+                // SdlEvent::RenderTargetsReset { timestamp } => todo!(),
+                // SdlEvent::RenderDeviceReset { timestamp } => todo!(),
+                // SdlEvent::User {
+                //     timestamp,
+                //     window_id,
+                //     type_,
+                //     code,
+                //     data1,
+                //     data2,
+                // } => todo!(),
+                // SdlEvent::Unknown { timestamp, type_ } => todo!(),
+                // SdlEvent::Display {
+                //     timestamp,
+                //     display,
+                //     display_event,
+                // } => todo!(),
+                e => {
+                    dbg!(e);
                 }
             }
         }

@@ -7,11 +7,16 @@ use bevy_ecs::{
     system::{Commands, Query},
     world::World,
 };
-use bevy_window::{RawHandleWrapper, RawHandleWrapperHolder, Window, WindowResized, WindowWrapper};
+use bevy_math::IVec2;
+use bevy_window::{
+    CursorEntered, CursorLeft, RawHandleWrapper, RawHandleWrapperHolder, Window,
+    WindowCloseRequested, WindowFocused, WindowMoved, WindowOccluded, WindowResized, WindowTheme,
+    WindowWrapper,
+};
 use raw_window_handle::{
     DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, WindowHandle,
 };
-use sdl3::{Sdl, event::WindowEvent, video::Window as Sdl3Window};
+use sdl3::{Sdl, VideoSubsystem, event::WindowEvent, video::Window as Sdl3Window};
 use tracing::info;
 
 use crate::{SDL_CONTEXT, non_send_marker::NonSendMarker};
@@ -74,19 +79,23 @@ impl Sdl3Windows {
         &mut self,
         sdl: &Sdl,
         entity: Entity,
-        _window: &Window,
+        bevy_window: &Window,
     ) -> Result<&WindowWrapper<SyncWindow>, Box<dyn Error + Send + Sync>> {
         let video = sdl.video()?;
-        let window = video
-            .window("Window Name", 800, 600)
+        let sdl_window = video
+            .window(
+                bevy_window.name.as_ref().unwrap_or(&"Bevy".to_string()),
+                bevy_window.width() as u32,
+                bevy_window.height() as u32,
+            )
             .position_centered()
             .resizable()
             .metal_view()
             .build()
             .map_err(|e| e.to_string())?;
-        let id = WindowId(window.id());
+        let id = WindowId(sdl_window.id());
         self.windows
-            .insert(id, WindowWrapper::new(SyncWindow(window)));
+            .insert(id, WindowWrapper::new(SyncWindow(sdl_window)));
         self.entity_to_winit.insert(entity, id);
         self.winit_to_entity.insert(id, entity);
 
@@ -121,16 +130,41 @@ pub fn create_windows(
                 .windows
                 .create_window(&context.sdl, entity, &*window)?;
 
+            if let Some(theme) = match VideoSubsystem::get_system_theme() {
+                sdl3::video::SystemTheme::Unknown => None,
+                sdl3::video::SystemTheme::Light => Some(WindowTheme::Light),
+                sdl3::video::SystemTheme::Dark => Some(WindowTheme::Dark),
+            } {
+                window.window_theme = Some(theme);
+            }
+
             window
                 .resolution
                 .set_scale_factor_and_apply_to_physical_size(sdl_window.display_scale());
 
-            // cache the window to detect changes
-            // commands.entity(entity).insert((
-            //     CachedWindow(window.clone()),
-            //     CachedCursorOptions(cursor_options.clone()),
-            //     WinitWindowPressedKeys::default(),
-            // ));
+            // sdl_window.maximize()
+            // sdl_window.minimize()
+            // sdl_window.hide()
+            // sdl_window.opacity()
+            // sdl_window.raise()
+            // sdl_window.restore()
+            // sdl_window.set_mouse_rect(rect)
+            // sdl_window.set_bordered(bordered)
+            // sdl_window.set_display_mode(display_mode)
+            // sdl_window.set_fullscreen(fullscreen)
+            // sdl_window.set_icon(icon)
+            // sdl_window.set_keyboard_grab(grabbed)
+            // sdl_window.set_maximum_size(width, height)
+            // sdl_window.set_minimum_size(width, height)
+            // sdl_window.set_mouse_grab(grabbed)
+            // sdl_window.set_opacity(opacity)
+            // sdl_window.set_position(x, y)
+            // sdl_window.set_size(width, height)
+            // sdl_window.set_title(title)
+
+            window
+                .resolution
+                .set_scale_factor_and_apply_to_physical_size(sdl_window.display_scale());
 
             if let Ok(handle_wrapper) = RawHandleWrapper::new(sdl_window) {
                 commands.entity(entity).insert(handle_wrapper.clone());
@@ -146,35 +180,102 @@ pub fn create_windows(
     Ok(())
 }
 
-pub fn handle_window_events(world: &mut World, timestamp: u64, window_id: u32, event: WindowEvent) {
-    match event {
-        WindowEvent::None => todo!(),
-        WindowEvent::Shown => todo!(),
-        WindowEvent::Hidden => todo!(),
-        WindowEvent::Exposed => todo!(),
-        WindowEvent::Moved(_, _) => todo!(),
-        WindowEvent::Resized(width, heights) => {
-            let window = SDL_CONTEXT
-                .with_borrow(|context| context.as_mut().unwrap().windows.get_window(entity));
-            window.resolution.set_physical_resolution(width, height);
+pub fn handle_window_events(
+    world: &mut World,
+    _timestamp: u64,
+    window_id: u32,
+    event: WindowEvent,
+) {
+    let window_entity = SDL_CONTEXT.with_borrow_mut(|context| {
+        let context = context.as_mut().unwrap();
+        *context
+            .windows
+            .winit_to_entity
+            .get(&window_id.into())
+            .unwrap()
+    });
 
-            world.write(WindowResized {
+    let Ok(mut entity_mut) = world.get_entity_mut(window_entity) else {
+        return;
+    };
+    let mut window = entity_mut.get_mut::<Window>().unwrap();
+
+    match event {
+        WindowEvent::Shown => {
+            world.send_event(WindowOccluded {
                 window: window_entity,
-                width: window.width(),
-                height: window.height(),
+                occluded: false,
             });
         }
-        WindowEvent::PixelSizeChanged(_, _) => todo!(),
-        WindowEvent::Minimized => todo!(),
-        WindowEvent::Maximized => todo!(),
-        WindowEvent::Restored => todo!(),
-        WindowEvent::MouseEnter => todo!(),
-        WindowEvent::MouseLeave => todo!(),
-        WindowEvent::FocusGained => todo!(),
-        WindowEvent::FocusLost => todo!(),
-        WindowEvent::CloseRequested => todo!(),
-        WindowEvent::HitTest(_, _) => todo!(),
-        WindowEvent::ICCProfChanged => todo!(),
-        WindowEvent::DisplayChanged(_) => todo!(),
+        WindowEvent::Hidden => {
+            world.send_event(WindowOccluded {
+                window: window_entity,
+                occluded: true,
+            });
+        }
+        WindowEvent::Exposed => {
+            world.send_event(WindowOccluded {
+                window: window_entity,
+                occluded: false,
+            });
+        }
+        WindowEvent::Moved(x, y) => {
+            let position = IVec2::new(x, y);
+            window.position.set(position);
+            world.send_event(WindowMoved {
+                window: window_entity,
+                position: IVec2::new(x, y),
+            });
+        }
+        WindowEvent::Resized(width, height) => {
+            window
+                .resolution
+                .set_physical_resolution(width as u32, height as u32);
+
+            world.send_event(WindowResized {
+                window: window_entity,
+                width: width as f32,
+                height: height as f32,
+            });
+        }
+        WindowEvent::PixelSizeChanged(_, _) => {}
+        WindowEvent::MouseEnter => {
+            world.send_event(CursorEntered {
+                window: window_entity,
+            });
+        }
+        WindowEvent::MouseLeave => {
+            world.send_event(CursorLeft {
+                window: window_entity,
+            });
+        }
+        WindowEvent::FocusGained => {
+            window.focused = true;
+
+            world.send_event(WindowFocused {
+                window: window_entity,
+                focused: true,
+            });
+        }
+        WindowEvent::FocusLost => {
+            window.focused = false;
+
+            world.send_event(WindowFocused {
+                window: window_entity,
+                focused: false,
+            });
+        }
+        WindowEvent::CloseRequested => {
+            world.send_event(WindowCloseRequested {
+                window: window_entity,
+            });
+        }
+        WindowEvent::None => {}
+        WindowEvent::Minimized => {}
+        WindowEvent::Maximized => {}
+        WindowEvent::Restored => {}
+        WindowEvent::HitTest(_, _) => {}
+        WindowEvent::ICCProfChanged => {}
+        WindowEvent::DisplayChanged(_) => {}
     }
 }
