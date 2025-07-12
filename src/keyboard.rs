@@ -5,7 +5,7 @@ use bevy_input::{
 };
 use sdl3::keyboard::{Keycode as SdlKeycode, Mod, Scancode as SdlScancode};
 
-use crate::SDL_CONTEXT;
+use crate::{SDL_CONTEXT, SdlContext};
 
 pub fn handle_keyboard_events(
     world: &mut World,
@@ -19,15 +19,7 @@ pub fn handle_keyboard_events(
     _which: u32,
     _raw: u16,
 ) {
-    let window = SDL_CONTEXT.with_borrow(|context| {
-        context
-            .as_ref()
-            .unwrap()
-            .windows
-            .winit_to_entity
-            .get(&window_id.into())
-            .copied()
-    });
+    let window = SDL_CONTEXT.with_borrow(SdlContext::get_window_entity(window_id));
     world.send_event(KeyboardInput {
         key_code: convert_sdl_scancode_to_physical_key(scancode.unwrap_or(SdlScancode::Unknown)),
         logical_key: convert_sdl_keycode_to_key(keycode.unwrap_or(SdlKeycode::Unknown), keymod),

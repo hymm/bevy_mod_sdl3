@@ -1,16 +1,19 @@
 mod keyboard;
+mod mouse;
 mod non_send_marker;
 mod window;
 
 use std::cell::RefCell;
 
 use bevy_app::{App, AppExit, Last, Plugin, PluginsState};
+use bevy_ecs::entity::Entity;
 use bevy_input::ButtonState;
 use bevy_window::WindowEvent;
 use sdl3::{Sdl, event::Event as SdlEvent};
 
 use crate::{
     keyboard::handle_keyboard_events,
+    mouse::{handle_mouse_button, handle_mouse_motion, handle_mouse_wheel},
     window::{Sdl3Windows, create_windows, handle_window_events},
 };
 
@@ -45,9 +48,7 @@ fn sdl3_runner(mut app: App) -> AppExit {
                     timestamp,
                     window_id,
                     win_event,
-                } => {
-                    handle_window_events(app.world_mut(), timestamp, window_id, win_event);
-                }
+                } => handle_window_events(app.world_mut(), timestamp, window_id, win_event),
                 SdlEvent::KeyDown {
                     timestamp,
                     window_id,
@@ -90,6 +91,55 @@ fn sdl3_runner(mut app: App) -> AppExit {
                     which,
                     raw,
                 ),
+                SdlEvent::MouseMotion {
+                    timestamp: _,
+                    window_id,
+                    which: _,
+                    mousestate: _,
+                    x,
+                    y,
+                    xrel,
+                    yrel,
+                } => handle_mouse_motion(app.world_mut(), window_id, x, y, xrel, yrel),
+                SdlEvent::MouseButtonDown {
+                    timestamp: _,
+                    window_id,
+                    which: _,
+                    mouse_btn,
+                    clicks: _,
+                    x: _,
+                    y: _,
+                } => handle_mouse_button(
+                    app.world_mut(),
+                    window_id,
+                    mouse_btn.into(),
+                    ButtonState::Pressed,
+                ),
+                SdlEvent::MouseButtonUp {
+                    timestamp: _,
+                    window_id,
+                    which: _,
+                    mouse_btn,
+                    clicks: _,
+                    x: _,
+                    y: _,
+                } => handle_mouse_button(
+                    app.world_mut(),
+                    window_id,
+                    mouse_btn.into(),
+                    ButtonState::Released,
+                ),
+                SdlEvent::MouseWheel {
+                    timestamp: _,
+                    window_id,
+                    which: _,
+                    x,
+                    y,
+                    direction,
+                    // position on window
+                    mouse_x: _,
+                    mouse_y: _,
+                } => handle_mouse_wheel(app.world_mut(), window_id, x, y, direction),
                 SdlEvent::Quit { .. } => {
                     break 'running;
                 }
@@ -127,44 +177,6 @@ fn sdl3_runner(mut app: App) -> AppExit {
                 //     timestamp,
                 //     window_id,
                 //     text,
-                // } => todo!(),
-                // SdlEvent::MouseMotion {
-                //     timestamp,
-                //     window_id,
-                //     which,
-                //     mousestate,
-                //     x,
-                //     y,
-                //     xrel,
-                //     yrel,
-                // } => todo!(),
-                // SdlEvent::MouseButtonDown {
-                //     timestamp,
-                //     window_id,
-                //     which,
-                //     mouse_btn,
-                //     clicks,
-                //     x,
-                //     y,
-                // } => todo!(),
-                // SdlEvent::MouseButtonUp {
-                //     timestamp,
-                //     window_id,
-                //     which,
-                //     mouse_btn,
-                //     clicks,
-                //     x,
-                //     y,
-                // } => todo!(),
-                // SdlEvent::MouseWheel {
-                //     timestamp,
-                //     window_id,
-                //     which,
-                //     x,
-                //     y,
-                //     direction,
-                //     mouse_x,
-                //     mouse_y,
                 // } => todo!(),
                 // SdlEvent::JoyAxisMotion {
                 //     timestamp,
@@ -344,7 +356,7 @@ fn sdl3_runner(mut app: App) -> AppExit {
 }
 
 thread_local! {
-    static SDL_CONTEXT: RefCell<Option<SdlContext>> = RefCell::new(None);
+    static SDL_CONTEXT: RefCell<Option<SdlContext>>  = RefCell::new(None);
 }
 
 pub struct SdlContext {
@@ -356,11 +368,23 @@ impl SdlContext {
     /// should be only called on the main thread
     fn init() {
         SDL_CONTEXT.with_borrow_mut(|context| {
-            *context = Some(Self {
+            *context = Some(SdlContext {
                 sdl: sdl3::init().unwrap(),
                 windows: Sdl3Windows::new(),
             });
         });
+    }
+
+    fn get_window_entity(sdl_id: u32) -> impl FnOnce(&Option<SdlContext>) -> Option<Entity> {
+        move |context| {
+            context
+                .as_ref()
+                .unwrap()
+                .windows
+                .winit_to_entity
+                .get(&sdl_id.into())
+                .copied()
+        }
     }
 }
 

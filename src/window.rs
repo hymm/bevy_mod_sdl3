@@ -140,7 +140,7 @@ pub fn create_windows(
 
             window
                 .resolution
-                .set_scale_factor_and_apply_to_physical_size(sdl_window.display_scale());
+                .set_scale_factor(sdl_window.display_scale());
 
             // sdl_window.maximize()
             // sdl_window.minimize()
@@ -198,7 +198,7 @@ pub fn handle_window_events(
     let Ok(mut entity_mut) = world.get_entity_mut(window_entity) else {
         return;
     };
-    let mut window = entity_mut.get_mut::<Window>().unwrap();
+    let mut bevy_window = entity_mut.get_mut::<Window>().unwrap();
 
     match event {
         WindowEvent::Shown => {
@@ -221,14 +221,17 @@ pub fn handle_window_events(
         }
         WindowEvent::Moved(x, y) => {
             let position = IVec2::new(x, y);
-            window.position.set(position);
+            bevy_window.position.set(position);
             world.send_event(WindowMoved {
                 window: window_entity,
                 position: IVec2::new(x, y),
             });
         }
         WindowEvent::Resized(width, height) => {
-            window
+            // is this the physical or the logical width and height?
+            // seems to be physical
+            dbg!("resized", width, height);
+            bevy_window
                 .resolution
                 .set_physical_resolution(width as u32, height as u32);
 
@@ -238,7 +241,22 @@ pub fn handle_window_events(
                 height: height as f32,
             });
         }
-        WindowEvent::PixelSizeChanged(_, _) => {}
+        WindowEvent::PixelSizeChanged(width, height) => {
+            dbg!("pixel size", width, height);
+            // is this the physical or the logical width and height? seems to be physical
+            bevy_window
+                .resolution
+                .set_physical_resolution(width as u32, height as u32);
+            // bevy_window
+            //     .resolution
+            //     .set_scale_factor(sdl_window.display_scale());
+
+            world.send_event(WindowResized {
+                window: window_entity,
+                width: width as f32,
+                height: height as f32,
+            });
+        }
         WindowEvent::MouseEnter => {
             world.send_event(CursorEntered {
                 window: window_entity,
@@ -250,7 +268,7 @@ pub fn handle_window_events(
             });
         }
         WindowEvent::FocusGained => {
-            window.focused = true;
+            bevy_window.focused = true;
 
             world.send_event(WindowFocused {
                 window: window_entity,
@@ -258,7 +276,7 @@ pub fn handle_window_events(
             });
         }
         WindowEvent::FocusLost => {
-            window.focused = false;
+            bevy_window.focused = false;
 
             world.send_event(WindowFocused {
                 window: window_entity,
@@ -270,12 +288,15 @@ pub fn handle_window_events(
                 window: window_entity,
             });
         }
-        WindowEvent::None => {}
-        WindowEvent::Minimized => {}
-        WindowEvent::Maximized => {}
-        WindowEvent::Restored => {}
-        WindowEvent::HitTest(_, _) => {}
-        WindowEvent::ICCProfChanged => {}
-        WindowEvent::DisplayChanged(_) => {}
+        // WindowEvent::None => {}
+        // WindowEvent::Minimized => {}
+        // WindowEvent::Maximized => {}
+        // WindowEvent::Restored => {}
+        // WindowEvent::HitTest(_, _) => {}
+        // WindowEvent::ICCProfChanged => {}
+        // WindowEvent::DisplayChanged(_) => {}
+        e => {
+            dbg!(e);
+        }
     }
 }
