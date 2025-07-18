@@ -277,10 +277,9 @@ pub fn handle_window_events(
                 window: window_entity,
             });
         }
+        // TODO: check if window occluded and resized events are sent when these are
+        WindowEvent::Minimized | WindowEvent::Maximized | WindowEvent::Restored => {}
         // WindowEvent::None => {}
-        // WindowEvent::Minimized => {}
-        // WindowEvent::Maximized => {}
-        // WindowEvent::Restored => {}
         // WindowEvent::HitTest(_, _) => {}
         // WindowEvent::ICCProfChanged => {}
         // WindowEvent::DisplayChanged(_) => {}

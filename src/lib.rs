@@ -49,6 +49,7 @@ fn sdl3_runner(mut app: App) -> AppExit {
                     window_id,
                     win_event,
                 } => handle_window_events(app.world_mut(), timestamp, window_id, win_event),
+                // Keyboard Events
                 SdlEvent::KeyDown {
                     timestamp,
                     window_id,
@@ -91,6 +92,7 @@ fn sdl3_runner(mut app: App) -> AppExit {
                     which,
                     raw,
                 ),
+                // Mouse Events
                 SdlEvent::MouseMotion {
                     timestamp: _,
                     window_id,
