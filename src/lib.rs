@@ -8,13 +8,13 @@ use std::cell::RefCell;
 use bevy_app::{App, AppExit, Last, Plugin, PluginsState};
 use bevy_ecs::entity::Entity;
 use bevy_input::ButtonState;
-use bevy_window::{WindowEvent, WindowWrapper};
+use bevy_window::WindowEvent;
 use sdl3::{Sdl, event::Event as SdlEvent};
 
 use crate::{
     keyboard::handle_keyboard_events,
     mouse::{handle_mouse_button, handle_mouse_motion, handle_mouse_wheel},
-    window::{Sdl3Windows, SyncWindow, create_windows, handle_window_events},
+    window::{Sdl3Windows, create_windows, handle_window_events},
 };
 
 pub struct Sdl3Plugin;
@@ -403,12 +403,4 @@ impl SdlContext {
             })
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {}
 }

@@ -19,7 +19,7 @@ use raw_window_handle::{
 use sdl3::{Sdl, VideoSubsystem, event::WindowEvent, video::Window as Sdl3Window};
 use tracing::info;
 
-use crate::{SDL_CONTEXT, non_send_marker::NonSendMarker};
+use crate::{SDL_CONTEXT, SdlContext, non_send_marker::NonSendMarker};
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct WindowId(pub u32);
@@ -186,14 +186,9 @@ pub fn handle_window_events(
     window_id: u32,
     event: WindowEvent,
 ) {
-    let window_entity = SDL_CONTEXT.with_borrow_mut(|context| {
-        let context = context.as_mut().unwrap();
-        *context
-            .windows
-            .winit_to_entity
-            .get(&window_id.into())
-            .unwrap()
-    });
+    let (window_entity, window_scale) = SDL_CONTEXT
+        .with_borrow(SdlContext::get_window_entity_and_scale(window_id))
+        .unwrap();
 
     let Ok(mut entity_mut) = world.get_entity_mut(window_entity) else {
         return;
@@ -228,12 +223,10 @@ pub fn handle_window_events(
             });
         }
         WindowEvent::Resized(width, height) => {
-            // is this the physical or the logical width and height?
-            // seems to be physical
-            dbg!("resized", width, height);
             bevy_window
                 .resolution
                 .set_physical_resolution(width as u32, height as u32);
+            bevy_window.resolution.set_scale_factor(window_scale);
 
             world.send_event(WindowResized {
                 window: window_entity,
@@ -242,14 +235,10 @@ pub fn handle_window_events(
             });
         }
         WindowEvent::PixelSizeChanged(width, height) => {
-            dbg!("pixel size", width, height);
-            // is this the physical or the logical width and height? seems to be physical
             bevy_window
                 .resolution
                 .set_physical_resolution(width as u32, height as u32);
-            // bevy_window
-            //     .resolution
-            //     .set_scale_factor(sdl_window.display_scale());
+            bevy_window.resolution.set_scale_factor(window_scale);
 
             world.send_event(WindowResized {
                 window: window_entity,
@@ -300,3 +289,6 @@ pub fn handle_window_events(
         }
     }
 }
+
+// push changes to bevy window to sdl
+pub fn update_windows() {}
