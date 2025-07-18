@@ -102,7 +102,7 @@ impl Sdl3Windows {
         Ok(self.windows.get(&id).unwrap())
     }
 
-    fn get_window(&self, entity: Entity) -> Option<&WindowWrapper<SyncWindow>> {
+    pub fn get_window(&self, entity: Entity) -> Option<&WindowWrapper<SyncWindow>> {
         let id = self.entity_to_winit.get(&entity)?;
         self.windows.get(id)
     }

@@ -8,13 +8,13 @@ use std::cell::RefCell;
 use bevy_app::{App, AppExit, Last, Plugin, PluginsState};
 use bevy_ecs::entity::Entity;
 use bevy_input::ButtonState;
-use bevy_window::WindowEvent;
+use bevy_window::{WindowEvent, WindowWrapper};
 use sdl3::{Sdl, event::Event as SdlEvent};
 
 use crate::{
     keyboard::handle_keyboard_events,
     mouse::{handle_mouse_button, handle_mouse_motion, handle_mouse_wheel},
-    window::{Sdl3Windows, create_windows, handle_window_events},
+    window::{Sdl3Windows, SyncWindow, create_windows, handle_window_events},
 };
 
 pub struct Sdl3Plugin;
@@ -384,6 +384,23 @@ impl SdlContext {
                 .winit_to_entity
                 .get(&sdl_id.into())
                 .copied()
+        }
+    }
+
+    fn get_window_entity_and_scale(
+        sdl_id: u32,
+    ) -> impl FnOnce(&Option<SdlContext>) -> Option<(Entity, f32)> {
+        move |context: &Option<SdlContext>| {
+            context.as_ref().and_then(|context| {
+                let entity = context
+                    .windows
+                    .winit_to_entity
+                    .get(&sdl_id.into())
+                    .copied()?;
+                let window = context.windows.get_window(entity)?;
+
+                Some((entity, window.display_scale()))
+            })
         }
     }
 }

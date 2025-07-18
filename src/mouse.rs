@@ -6,7 +6,7 @@ use bevy_input::{
     },
 };
 use bevy_math::Vec2;
-use bevy_window::CursorMoved;
+use bevy_window::{CursorMoved, Window as BevyWindow};
 use sdl3::mouse::{MouseButton as SdlMouseButton, MouseWheelDirection};
 
 use crate::{SDL_CONTEXT, SdlContext};
@@ -19,8 +19,8 @@ pub fn handle_mouse_motion(
     xrel: f32,
     yrel: f32,
 ) {
-    let window = SDL_CONTEXT
-        .with_borrow(SdlContext::get_window_entity(window_id))
+    let (entity, scale) = SDL_CONTEXT
+        .with_borrow(SdlContext::get_window_entity_and_scale(window_id))
         .unwrap();
 
     // Note that this is actually sending the accumulated mouse delta unlike winit
@@ -28,20 +28,20 @@ pub fn handle_mouse_motion(
         delta: Vec2::new(xrel, yrel),
     });
 
-    // let physical_position = DVec2::new(position.x, position.y);
+    let physical_position = Vec2::new(x, y);
+    let logical_position = physical_position / scale;
 
-    // let last_position = win.physical_cursor_position();
-    // let delta = last_position
-    //     .map(|last_pos| (physical_position.as_vec2() - last_pos) / win.resolution.scale_factor());
+    let mut entity_mut = world.get_entity_mut(entity).unwrap();
+    let mut bevy_window = entity_mut.get_mut::<BevyWindow>().unwrap();
 
-    // win.set_physical_cursor_position(Some(physical_position));
+    let last_position = bevy_window.physical_cursor_position();
+    let delta = last_position.map(|last_pos| (physical_position - last_pos) / scale);
+    bevy_window.set_physical_cursor_position(Some(physical_position.into()));
 
     world.send_event(CursorMoved {
-        window,
-        // TODO: do we need to adjust for window scale factor here?
-        position: Vec2::new(x, y),
-        // TODO: calculate from the last window position
-        delta: Some(Vec2::default()),
+        window: entity,
+        position: logical_position,
+        delta,
     });
 }
 
